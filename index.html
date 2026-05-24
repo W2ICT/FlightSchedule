@@ -1,0 +1,847 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<title>ระบบตารางจัดบิน ฝูงบิน 69</title>
+<style>
+/* ═══════════════════════════════════════════
+   CSS VARIABLES
+═══════════════════════════════════════════ */
+:root{
+  --sb-w:220px; --sb-cw:56px;
+  --bg:#0f172a; --bg2:#1e293b; --bg3:#162032; --bg4:#0d1626;
+  --border:#2d3f55; --border2:#1a2740;
+  --text:#e2e8f0; --text2:#94a3b8; --text3:#4e6480;
+  --accent:#3b82f6; --accent2:#1d4ed8; --accent-glow:rgba(59,130,246,.15);
+  --hdr:#0d1626; --hover:#182235;
+  --dg:#101e33; --fy-bg:#09172a; --fy-line:#1d4ed8;
+  --sh:0 2px 8px rgba(0,0,0,.4);
+  --radius:8px; --trans:.22s cubic-bezier(.4,0,.2,1);
+}
+[data-theme=light]{
+  --bg:#f0f4f8; --bg2:#ffffff; --bg3:#e8f0fa; --bg4:#e2eaf5;
+  --border:#d1dce8; --border2:#e8f0fa;
+  --text:#0f172a; --text2:#4a6080; --text3:#94a3b8;
+  --accent:#2563eb; --accent2:#1d4ed8; --accent-glow:rgba(37,99,235,.1);
+  --hdr:#1e3a8a; --hover:#ddeeff;
+  --dg:#dbeafe; --fy-bg:#bfdbfe; --fy-line:#3b82f6;
+  --sh:0 2px 8px rgba(0,0,0,.1);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden}
+body{font-family:'Sarabun','Segoe UI',sans-serif;background:var(--bg);color:var(--text);transition:background var(--trans),color var(--trans)}
+
+/* ═══════════════════════════════════════════
+   LOADING SCREEN
+═══════════════════════════════════════════ */
+#ls{
+  position:fixed;inset:0;background:var(--bg4);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  z-index:9999;gap:0;
+}
+.ls-heli{font-size:3.2rem;line-height:1;animation:hover-fly 2.4s ease-in-out infinite;margin-bottom:20px}
+@keyframes hover-fly{
+  0%,100%{transform:translateY(0) rotate(0deg)}
+  30%{transform:translateY(-10px) rotate(-4deg)}
+  70%{transform:translateY(4px) rotate(3deg)}
+}
+.ls-rotor{position:relative;display:inline-block}
+.ls-rotor::before{
+  content:''; position:absolute; top:-6px; left:50%; transform:translateX(-50%);
+  width:60px;height:3px;background:var(--accent);border-radius:2px;
+  transform-origin:center;animation:rotor .3s linear infinite;
+}
+@keyframes rotor{to{transform:translateX(-50%) rotate(360deg)}}
+.ls-title{font-size:1.4rem;font-weight:700;color:#93c5fd;letter-spacing:.02em;margin-bottom:4px}
+.ls-sub{font-size:.85rem;color:var(--text3);margin-bottom:28px}
+.ls-track{width:240px;height:3px;background:var(--border);border-radius:2px;overflow:hidden;margin-bottom:14px}
+.ls-bar{height:100%;width:0;background:linear-gradient(90deg,var(--accent2),var(--accent));border-radius:2px;transition:width .4s ease}
+.ls-msg{font-size:.8rem;color:var(--text2);min-height:1.2em;text-align:center}
+[data-theme=light] .ls-title{color:#1e40af}
+
+/* ═══════════════════════════════════════════
+   APP SHELL  (hidden until loaded)
+═══════════════════════════════════════════ */
+#app{display:none;height:100vh;overflow:hidden}
+.layout{display:flex;height:100vh;overflow:hidden}
+
+/* ═══════════════════════════════════════════
+   SIDEBAR
+═══════════════════════════════════════════ */
+.sb{
+  width:var(--sb-w);flex-shrink:0;
+  background:var(--bg2);border-right:1px solid var(--border);
+  display:flex;flex-direction:column;
+  transition:width var(--trans);overflow:hidden;
+  position:relative;z-index:100;
+}
+.sb.collapsed{width:var(--sb-cw)}
+
+/* Sidebar logo */
+.sb-logo{
+  padding:14px 16px;display:flex;align-items:center;gap:10px;
+  border-bottom:1px solid var(--border);min-height:54px;flex-shrink:0;
+}
+.sb-logo-icon{font-size:1.4rem;flex-shrink:0;line-height:1}
+.sb-logo-text{overflow:hidden;white-space:nowrap}
+.sb-logo-text h2{font-size:.9rem;font-weight:700;color:var(--accent);line-height:1.2}
+.sb-logo-text p{font-size:.68rem;color:var(--text3);margin-top:2px}
+
+/* Nav items */
+.sb-nav{padding:8px 0;flex:1;overflow-y:auto;overflow-x:hidden}
+.sb-item{
+  display:flex;align-items:center;gap:10px;
+  width:100%;padding:10px 16px;
+  background:none;border:none;cursor:pointer;
+  color:var(--text2);font-family:inherit;font-size:.85rem;font-weight:600;
+  text-align:left;transition:all .15s;white-space:nowrap;
+  position:relative;border-radius:0;
+}
+.sb-item:hover{color:var(--text);background:var(--hover)}
+.sb-item.on{color:var(--accent);background:var(--accent-glow)}
+.sb-item.on::before{content:'';position:absolute;left:0;top:6px;bottom:6px;width:3px;background:var(--accent);border-radius:0 2px 2px 0}
+.sb-icon{font-size:1.1rem;flex-shrink:0;width:24px;text-align:center}
+.sb-label{overflow:hidden;white-space:nowrap}
+
+.sb-divider{height:1px;background:var(--border);margin:6px 12px}
+
+/* Sidebar footer (stats) */
+.sb-foot{
+  padding:10px 14px;border-top:1px solid var(--border);
+  flex-shrink:0;overflow:hidden;
+}
+.sb-stat{font-size:.7rem;color:var(--text3);white-space:nowrap;line-height:1.7}
+.sb-stat strong{color:var(--accent);font-size:.82rem}
+
+/* Collapsed state — hide text */
+.sb.collapsed .sb-label,
+.sb.collapsed .sb-logo-text,
+.sb.collapsed .sb-stat{display:none}
+.sb.collapsed .sb-item{justify-content:center;padding:10px 0}
+.sb.collapsed .sb-logo{justify-content:center;padding:14px 0}
+.sb.collapsed .sb-foot{padding:10px 0;text-align:center}
+.sb.collapsed .sb-divider{margin:6px 8px}
+
+/* Toggle button */
+.sb-toggle{
+  position:absolute;top:14px;right:-13px;z-index:10;
+  width:26px;height:26px;border-radius:50%;
+  background:var(--bg2);border:1px solid var(--border);
+  cursor:pointer;display:flex;align-items:center;justify-content:center;
+  font-size:.75rem;color:var(--text2);transition:all .15s;
+  box-shadow:var(--sh);
+}
+.sb-toggle:hover{background:var(--accent);color:#fff;border-color:var(--accent)}
+
+/* ═══════════════════════════════════════════
+   MOBILE OVERLAY
+═══════════════════════════════════════════ */
+.overlay{
+  display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);
+  z-index:99;opacity:0;transition:opacity var(--trans);
+}
+.overlay.show{display:block;opacity:1}
+
+/* ═══════════════════════════════════════════
+   MAIN CONTENT
+═══════════════════════════════════════════ */
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0}
+
+/* Topbar */
+.topbar{
+  height:54px;background:var(--hdr);border-bottom:1px solid var(--border);
+  display:flex;align-items:center;gap:10px;padding:0 16px;
+  flex-shrink:0;
+}
+.topbar-hamburger{
+  background:none;border:none;color:var(--text2);font-size:1.2rem;
+  cursor:pointer;padding:6px;border-radius:6px;line-height:1;
+  transition:all .15s;display:none;
+}
+.topbar-hamburger:hover{background:var(--hover);color:var(--text)}
+.topbar-title{font-size:.95rem;font-weight:700;color:#93c5fd;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+[data-theme=light] .topbar-title{color:#bfdbfe}
+.topbar-right{display:flex;align-items:center;gap:6px}
+.tb-btn{
+  background:none;border:1px solid transparent;color:var(--text2);
+  padding:5px 8px;border-radius:6px;cursor:pointer;font-size:.78rem;
+  font-family:inherit;transition:all .15s;white-space:nowrap;
+}
+.tb-btn:hover{border-color:var(--border);color:var(--text)}
+.tb-badge{background:var(--accent2);color:#bfdbfe;padding:3px 10px;border-radius:20px;font-size:.68rem;font-weight:700;white-space:nowrap}
+.tb-time{font-size:.65rem;color:var(--text3);white-space:nowrap}
+
+/* ═══════════════════════════════════════════
+   FILTERS
+═══════════════════════════════════════════ */
+.filters{background:var(--bg2);padding:10px 16px;border-bottom:1px solid var(--border);flex-shrink:0}
+.frow{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end}
+.fg{display:flex;flex-direction:column;gap:3px;flex:1;min-width:110px}
+.fg.wide{flex:2;min-width:180px}
+.fg.narrow{max-width:155px;flex:none}
+.dp{display:flex;gap:6px;flex:2;min-width:230px}
+.dp .ds{display:flex;flex-direction:column;gap:3px;flex:1}
+.fl{font-size:.63rem;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.07em}
+.fi{
+  background:var(--bg);border:1px solid var(--border);color:var(--text);
+  padding:5px 8px;border-radius:6px;font-size:.8rem;font-family:inherit;
+  width:100%;transition:border-color .15s;
+}
+.fi:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-glow)}
+.fi::placeholder{color:var(--text3)}
+select.fi{cursor:pointer}
+.brow{display:flex;gap:5px;align-items:flex-end}
+.btn{padding:5px 12px;border-radius:6px;border:none;font-size:.8rem;font-weight:700;cursor:pointer;font-family:inherit;transition:all .15s;white-space:nowrap}
+.btn-p{background:var(--accent);color:#fff}.btn-p:hover{background:var(--accent2)}
+.btn-c{background:var(--bg3);color:var(--text2);border:1px solid var(--border)}.btn-c:hover{border-color:var(--text2)}
+
+/* ═══════════════════════════════════════════
+   STATS BAR
+═══════════════════════════════════════════ */
+.stats{background:var(--bg3);padding:6px 16px;border-bottom:1px solid var(--border2);display:flex;gap:16px;align-items:center;flex-wrap:wrap;flex-shrink:0}
+.si{display:flex;align-items:baseline;gap:4px;font-size:.73rem;color:var(--text3)}
+.sn{font-size:.88rem;font-weight:800;color:var(--accent)}
+.sl{color:var(--accent);font-weight:600;font-size:.75rem}
+
+/* ═══════════════════════════════════════════
+   VIEWS
+═══════════════════════════════════════════ */
+.view{display:none;flex-direction:column;flex:1;overflow:hidden}
+.view.on{display:flex}
+
+/* ═══════════════════════════════════════════
+   TABLE
+═══════════════════════════════════════════ */
+.twrap{flex:1;overflow:auto;padding:10px 14px}
+table{width:100%;border-collapse:collapse;font-size:.78rem}
+thead th{
+  background:var(--bg3);color:var(--text2);
+  padding:7px 8px;text-align:center;
+  font-weight:700;font-size:.62rem;text-transform:uppercase;letter-spacing:.07em;
+  border-bottom:2px solid var(--border);white-space:nowrap;
+  position:sticky;top:0;z-index:5;
+}
+/* Left-align header for route & remark */
+thead th.th-left{text-align:left}
+
+tbody tr{border-bottom:1px solid var(--border2);transition:background .1s}
+tbody tr:hover{background:var(--hover)}
+tbody td{padding:6px 8px;vertical-align:middle;text-align:center}
+/* Left-align specific columns */
+tbody td.td-left{text-align:left}
+
+/* FY separator row */
+.fy-row td{
+  background:var(--fy-bg)!important;color:var(--accent)!important;
+  font-size:.65rem;font-weight:800;letter-spacing:.14em;text-transform:uppercase;
+  padding:4px 10px;border-top:2px solid var(--fy-line);border-bottom:none!important;
+  text-align:left!important;
+}
+/* Date group row */
+.dg-row td{
+  background:var(--dg)!important;color:var(--text2)!important;
+  font-size:.78rem;font-weight:700;padding:5px 10px;
+  border-bottom:none!important;text-align:left!important;
+}
+
+/* ═══════════════════════════════════════════
+   BADGES
+═══════════════════════════════════════════ */
+.day-b{display:inline-block;padding:2px 8px;border-radius:10px;font-size:.68rem;font-weight:800;white-space:nowrap;min-width:62px;text-align:center}
+.day-จันทร์{background:#422006;color:#fbbf24}
+.day-อังคาร{background:#3f0d1f;color:#fb7185}
+.day-พุธ{background:#052e16;color:#4ade80}
+.day-พฤหัสบดี{background:#3d1f00;color:#fb923c}
+.day-ศุกร์{background:#172554;color:#60a5fa}
+.day-เสาร์{background:#2e1065;color:#c084fc}
+.day-อาทิตย์{background:#3b0a0a;color:#f87171}
+[data-theme=light] .day-จันทร์{background:#fef9c3;color:#a16207}
+[data-theme=light] .day-อังคาร{background:#ffe4e6;color:#be123c}
+[data-theme=light] .day-พุธ{background:#dcfce7;color:#15803d}
+[data-theme=light] .day-พฤหัสบดี{background:#ffedd5;color:#c2410c}
+[data-theme=light] .day-ศุกร์{background:#dbeafe;color:#1d4ed8}
+[data-theme=light] .day-เสาร์{background:#f3e8ff;color:#7e22ce}
+[data-theme=light] .day-อาทิตย์{background:#fee2e2;color:#b91c1c}
+
+.ac{display:inline-block;padding:2px 7px;border-radius:5px;font-size:.68rem;font-weight:700;white-space:nowrap}
+.ac-S-92A{background:#1e3a5f;color:#93c5fd}
+.ac-S-70i{background:#1a3d28;color:#86efac}
+.ac-EC725{background:#3b1c4a;color:#d8b4fe}
+.ac-Bell412{background:#3b2a14;color:#fcd34d}
+.ac-H135{background:#1c2e3b;color:#7dd3fc}
+.ac-UH-1H,.ac-UH1H{background:#2e1c1c;color:#fca5a5}
+.ac-def{background:var(--bg3);color:var(--text2)}
+[data-theme=light] .ac-S-92A{background:#dbeafe;color:#1e40af}
+[data-theme=light] .ac-S-70i{background:#dcfce7;color:#166534}
+[data-theme=light] .ac-EC725{background:#f3e8ff;color:#6b21a8}
+[data-theme=light] .ac-Bell412{background:#fef9c3;color:#854d0e}
+[data-theme=light] .ac-H135{background:#e0f2fe;color:#0c4a6e}
+[data-theme=light] .ac-UH-1H,[data-theme=light] .ac-UH1H{background:#fee2e2;color:#991b1b}
+
+.src{font-size:.6rem;padding:1px 5px;border-radius:3px;font-weight:700}
+.src-REV201{background:#374151;color:#9ca3af}
+.src-REV202{background:#1e3a5f;color:#93c5fd}
+.src-REV203{background:#1a3d28;color:#86efac}
+[data-theme=light] .src-REV201{background:#e5e7eb;color:#374151}
+[data-theme=light] .src-REV202{background:#dbeafe;color:#1e40af}
+[data-theme=light] .src-REV203{background:#dcfce7;color:#166534}
+
+/* ═══════════════════════════════════════════
+   CELL STYLES
+═══════════════════════════════════════════ */
+.c-time{color:#34d399;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
+.c-acno{color:#fbbf24;font-weight:700}
+.c-cs{color:#a78bfa;font-weight:600}
+.c-dt{color:var(--text2);font-size:.75rem;white-space:nowrap}
+.c-trunc{max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.c-remark{max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text2);font-size:.73rem}
+[data-theme=light] .c-time{color:#059669}
+[data-theme=light] .c-acno{color:#92400e}
+[data-theme=light] .c-cs{color:#6d28d9}
+
+/* ═══════════════════════════════════════════
+   EMPTY STATE
+═══════════════════════════════════════════ */
+.empty{text-align:center;padding:48px 20px;color:var(--text3)}
+.empty .ico{font-size:2.2rem;margin-bottom:8px}
+.empty p{font-size:.85rem}
+
+/* ═══════════════════════════════════════════
+   SCROLLBAR
+═══════════════════════════════════════════ */
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+
+/* ═══════════════════════════════════════════
+   RESPONSIVE — MOBILE (< 768px)
+═══════════════════════════════════════════ */
+@media(max-width:767px){
+  .sb{
+    position:fixed;left:0;top:0;bottom:0;z-index:200;
+    transform:translateX(-100%);transition:transform var(--trans);
+    width:var(--sb-w)!important;
+  }
+  .sb.mobile-open{transform:translateX(0)}
+  .sb-toggle{display:none}
+  .topbar-hamburger{display:flex}
+  .fg.narrow{max-width:none;flex:1;min-width:100px}
+  .dp{min-width:180px}
+  .tb-time{display:none}
+  table{font-size:.72rem}
+  thead th,tbody td{padding:5px 6px}
+  .day-b{min-width:50px;font-size:.62rem}
+}
+
+/* ═══════════════════════════════════════════
+   RESPONSIVE — TABLET (768–1024px)
+═══════════════════════════════════════════ */
+@media(min-width:768px)and(max-width:1024px){
+  :root{--sb-w:190px}
+  .fg.narrow{max-width:130px}
+  table{font-size:.75rem}
+}
+</style>
+</head>
+<body>
+
+<!-- ════════════════════════════════════
+     LOADING SCREEN
+════════════════════════════════════ -->
+<div id="ls">
+  <div class="ls-heli">🚁</div>
+  <div class="ls-title">ระบบตารางจัดบิน</div>
+  <div class="ls-sub">ฝูงบิน 69 · กำลังซิงค์ข้อมูล…</div>
+  <div style="margin-top:24px;width:240px">
+    <div class="ls-track"><div class="ls-bar" id="ls-bar"></div></div>
+    <p class="ls-msg" id="ls-msg" style="margin-top:10px">กำลังเชื่อมต่อ Google Sheets…</p>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════
+     APP
+════════════════════════════════════ -->
+<div id="app">
+<div class="layout">
+
+  <!-- ── Sidebar ── -->
+  <aside class="sb" id="sb">
+    <button class="sb-toggle" id="sb-toggle" onclick="toggleSb()" title="ย่อ/ขยาย Sidebar">‹</button>
+
+    <div class="sb-logo">
+      <span class="sb-logo-icon">🚁</span>
+      <div class="sb-logo-text">
+        <h2>ฝูงบิน 69</h2>
+        <p>Flight Schedule</p>
+      </div>
+    </div>
+
+    <nav class="sb-nav">
+      <button class="sb-item on" id="nav-w" onclick="switchView('w')">
+        <span class="sb-icon">📅</span>
+        <span class="sb-label">รายสัปดาห์</span>
+      </button>
+      <button class="sb-item" id="nav-d" onclick="switchView('d')">
+        <span class="sb-icon">📆</span>
+        <span class="sb-label">รายวัน</span>
+      </button>
+      <div class="sb-divider"></div>
+      <button class="sb-item" onclick="doRefresh()" id="nav-refresh">
+        <span class="sb-icon">🔄</span>
+        <span class="sb-label">โหลดใหม่</span>
+      </button>
+    </nav>
+
+    <div class="sb-foot">
+      <div class="sb-stat">รวม <strong id="sb-total">—</strong> เที่ยวบิน</div>
+      <div class="sb-stat" id="sb-time" style="margin-top:2px"></div>
+    </div>
+  </aside>
+
+  <!-- Mobile overlay -->
+  <div class="overlay" id="overlay" onclick="closeMobileSb()"></div>
+
+  <!-- ── Main ── -->
+  <div class="main">
+
+    <!-- Topbar -->
+    <header class="topbar">
+      <button class="topbar-hamburger" id="hamburger" onclick="openMobileSb()">☰</button>
+      <span class="topbar-title" id="view-title">จัดบินรายสัปดาห์</span>
+      <div class="topbar-right">
+        <span class="tb-time" id="tb-time"></span>
+        <span class="tb-badge" id="tb-badge">—</span>
+        <button class="tb-btn" id="theme-btn" onclick="toggleTheme()">☀️</button>
+      </div>
+    </header>
+
+    <!-- ════ WEEKLY VIEW ════ -->
+    <div class="view on" id="view-w">
+      <div class="filters">
+        <div class="frow">
+          <div class="fg narrow"><label class="fl">ปีงบประมาณ</label><select class="fi" id="w-fy"></select></div>
+          <div class="dp">
+            <div class="ds"><label class="fl">ตั้งแต่</label><input type="date" class="fi" id="w-from"></div>
+            <div class="ds"><label class="fl">ถึง</label><input type="date" class="fi" id="w-to"></div>
+          </div>
+          <div class="fg wide"><label class="fl">🔍 ค้นหา</label><input type="text" class="fi" id="w-q" placeholder="ชื่อนักบิน · หมายเลข · ภารกิจ · Callsign…"></div>
+          <div class="fg narrow"><label class="fl">A/C Type</label><select class="fi" id="w-ac"></select></div>
+          <div class="fg narrow"><label class="fl">Flight Type</label><select class="fi" id="w-ft"></select></div>
+          <div class="brow">
+            <button class="btn btn-p" onclick="renderW()">ค้นหา</button>
+            <button class="btn btn-c" onclick="clearW()">ล้าง</button>
+          </div>
+        </div>
+      </div>
+      <div class="stats">
+        <div class="si"><span class="sn" id="w-cnt">0</span>&nbsp;เที่ยวบิน</div>
+        <div class="si"><span class="sn" id="w-days">0</span>&nbsp;วัน</div>
+        <div class="si sl" id="w-range"></div>
+      </div>
+      <div class="twrap">
+        <table>
+          <thead><tr>
+            <th>วัน</th><th>วันที่</th><th>A/C Type</th><th>หมายเลข</th>
+            <th>T/O – L/D</th><th>ชื่อนักบิน</th><th>Mission</th>
+            <th>Callsign</th><th class="th-left">เส้นทางบิน</th>
+            <th>IFF</th><th>Fuel</th><th class="th-left">Remark</th><th>แหล่ง</th>
+          </tr></thead>
+          <tbody id="w-body"></tbody>
+        </table>
+        <div class="empty" id="w-empty" style="display:none"><div class="ico">🔍</div><p>ไม่พบข้อมูลที่ตรงกับเงื่อนไข</p></div>
+      </div>
+    </div>
+
+    <!-- ════ DAILY VIEW ════ -->
+    <div class="view" id="view-d">
+      <div class="filters">
+        <div class="frow">
+          <div class="fg narrow"><label class="fl">วันที่</label><input type="date" class="fi" id="d-date"></div>
+          <div class="fg wide"><label class="fl">🔍 ค้นหา</label><input type="text" class="fi" id="d-q" placeholder="ชื่อนักบิน · หมายเลข · ภารกิจ · Callsign…"></div>
+          <div class="fg narrow"><label class="fl">A/C Type</label><select class="fi" id="d-ac"></select></div>
+          <div class="fg narrow"><label class="fl">Flight Type</label><select class="fi" id="d-ft"></select></div>
+          <div class="brow">
+            <button class="btn btn-p" onclick="renderD()">ค้นหา</button>
+            <button class="btn btn-c" onclick="clearD()">ล้าง</button>
+          </div>
+        </div>
+      </div>
+      <div class="stats">
+        <div class="si"><span class="sn" id="d-cnt">0</span>&nbsp;เที่ยวบิน</div>
+        <div class="si sl" id="d-label"></div>
+      </div>
+      <div class="twrap">
+        <table>
+          <thead><tr>
+            <th>T/O – L/D</th><th>A/C Type</th><th>หมายเลข</th><th>วัน</th>
+            <th>ชื่อนักบิน</th><th>Mission</th>
+            <th>Callsign</th><th class="th-left">เส้นทางบิน</th>
+            <th>IFF</th><th>Fuel</th><th class="th-left">Remark</th><th>แหล่ง</th>
+          </tr></thead>
+          <tbody id="d-body"></tbody>
+        </table>
+        <div class="empty" id="d-empty" style="display:none"><div class="ico">📅</div><p>ไม่มีข้อมูลการบินในวันที่เลือก</p></div>
+      </div>
+    </div>
+
+  </div><!-- /main -->
+</div><!-- /layout -->
+</div><!-- /app -->
+
+<script>
+/* ════════════════════════════════════
+   STATE
+════════════════════════════════════ */
+var REC = [], FY69_FROM = '2025-10-01', FY69_TO = '2026-09-30';
+
+/* ════════════════════════════════════
+   LOADING ANIMATION
+════════════════════════════════════ */
+var loadMsgs = [
+  'กำลังเชื่อมต่อ Google Sheets…',
+  'กำลังโหลด REV201…',
+  'กำลังโหลด REV202…',
+  'กำลังโหลด REV203…',
+  'กำลังรวมและจัดเรียงข้อมูล…',
+  'เกือบเสร็จแล้ว…'
+];
+var lsIdx = 0, lsPct = 0, lsTimer;
+
+function startLoadAnim() {
+  lsTimer = setInterval(function() {
+    lsPct = Math.min(lsPct + (lsPct < 70 ? 12 : lsPct < 90 ? 4 : 1), 95);
+    el('ls-bar').style.width = lsPct + '%';
+    if (lsIdx < loadMsgs.length) {
+      el('ls-msg').textContent = loadMsgs[lsIdx++];
+    }
+  }, 900);
+}
+
+function finishLoadAnim(cb) {
+  clearInterval(lsTimer);
+  el('ls-bar').style.width = '100%';
+  el('ls-msg').textContent = 'พร้อมใช้งาน ✓';
+  setTimeout(cb, 350);
+}
+
+/* ════════════════════════════════════
+   BOOT
+════════════════════════════════════ */
+window.addEventListener('load', function() {
+  startLoadAnim();
+  google.script.run
+    .withSuccessHandler(onLoaded)
+    .withFailureHandler(onError)
+    .getFlightDataCached();
+});
+
+function onLoaded(data) {
+  REC = data.records;
+  finishLoadAnim(function() {
+    el('ls').style.display = 'none';
+    el('app').style.display = 'block';
+    initApp(data);
+  });
+}
+
+function onError(err) {
+  clearInterval(lsTimer);
+  el('ls-msg').textContent = '⚠️ โหลดไม่สำเร็จ — กรุณาลองใหม่';
+  el('ls-bar').style.background = '#ef4444';
+  el('ls-bar').style.width = '100%';
+  setTimeout(function(){
+    alert('เกิดข้อผิดพลาด:\n' + err);
+  }, 300);
+}
+
+/* ════════════════════════════════════
+   INIT APP
+════════════════════════════════════ */
+function initApp(data) {
+  // Header badges
+  el('tb-badge').textContent  = REC.length.toLocaleString() + ' เที่ยวบิน';
+  el('sb-total').textContent  = REC.length.toLocaleString();
+  el('tb-time').textContent   = data.generatedAt ? '🕐 ' + data.generatedAt : '';
+  el('sb-time').textContent   = data.generatedAt || '';
+
+  // Dropdowns
+  fillSel('w-fy', data.fiscalYears, '— ทุกปีงบฯ —');
+  fillSel('w-ac', data.acTypes,     '— ทุก A/C —');
+  fillSel('w-ft', data.flightTypes, '— ทุก Flight Type —');
+  fillSel('d-ac', data.acTypes,     '— ทุก A/C —');
+  fillSel('d-ft', data.flightTypes, '— ทุก Flight Type —');
+
+  // ★ Default: กรองเฉพาะปีงบฯ 69
+  el('w-fy').value   = 'ปีงบฯ 69';
+  el('w-from').value = FY69_FROM;
+  el('w-to').value   = FY69_TO;
+  el('d-date').value = toInputDate(new Date());
+
+  // Listeners
+  ['w-fy','w-from','w-to','w-ac','w-ft'].forEach(function(id){
+    el(id).addEventListener('change', renderW);
+  });
+  el('w-q').addEventListener('keydown', function(e){ if(e.key==='Enter') renderW(); });
+  ['d-date','d-ac','d-ft'].forEach(function(id){
+    el(id).addEventListener('change', renderD);
+  });
+  el('d-q').addEventListener('keydown', function(e){ if(e.key==='Enter') renderD(); });
+
+  // Sidebar: auto-collapse on small desktop
+  if (window.innerWidth >= 768 && window.innerWidth < 900) collapseSb();
+
+  renderW();
+  renderD();
+}
+
+/* ════════════════════════════════════
+   REFRESH
+════════════════════════════════════ */
+function doRefresh() {
+  el('nav-refresh').querySelector('.sb-icon').textContent = '⏳';
+  google.script.run
+    .withSuccessHandler(function(data) {
+      REC = data.records;
+      el('nav-refresh').querySelector('.sb-icon').textContent = '🔄';
+      el('tb-badge').textContent = REC.length.toLocaleString() + ' เที่ยวบิน';
+      el('sb-total').textContent = REC.length.toLocaleString();
+      el('tb-time').textContent  = data.generatedAt ? '🕐 ' + data.generatedAt : '';
+      fillSel('w-fy', data.fiscalYears, '— ทุกปีงบฯ —');
+      fillSel('w-ac', data.acTypes,     '— ทุก A/C —');
+      fillSel('w-ft', data.flightTypes, '— ทุก Flight Type —');
+      fillSel('d-ac', data.acTypes,     '— ทุก A/C —');
+      fillSel('d-ft', data.flightTypes, '— ทุก Flight Type —');
+      el('w-fy').value = 'ปีงบฯ 69';
+      renderW(); renderD();
+    })
+    .withFailureHandler(function(){ el('nav-refresh').querySelector('.sb-icon').textContent = '❌'; })
+    .refreshData();
+}
+
+/* ════════════════════════════════════
+   SIDEBAR
+════════════════════════════════════ */
+var sbCollapsed = false;
+
+function toggleSb() {
+  sbCollapsed ? expandSb() : collapseSb();
+}
+function collapseSb() {
+  sbCollapsed = true;
+  el('sb').classList.add('collapsed');
+  el('sb-toggle').textContent = '›';
+}
+function expandSb() {
+  sbCollapsed = false;
+  el('sb').classList.remove('collapsed');
+  el('sb-toggle').textContent = '‹';
+}
+
+// Mobile
+function openMobileSb() {
+  el('sb').classList.add('mobile-open');
+  el('overlay').classList.add('show');
+}
+function closeMobileSb() {
+  el('sb').classList.remove('mobile-open');
+  el('overlay').classList.remove('show');
+}
+
+/* ════════════════════════════════════
+   VIEW SWITCHING
+════════════════════════════════════ */
+var views = ['w','d'];
+var viewNames = { w:'จัดบินรายสัปดาห์', d:'จัดบินรายวัน' };
+
+function switchView(v) {
+  views.forEach(function(x){
+    el('view-'+x).classList.toggle('on', x===v);
+    el('nav-'+x).classList.toggle('on', x===v);
+  });
+  el('view-title').textContent = viewNames[v];
+  if (window.innerWidth < 768) closeMobileSb();
+}
+
+/* ════════════════════════════════════
+   THEME
+════════════════════════════════════ */
+var dark = true;
+function toggleTheme() {
+  dark = !dark;
+  document.documentElement.setAttribute('data-theme', dark ? '' : 'light');
+  el('theme-btn').textContent = dark ? '☀️' : '🌙';
+}
+
+/* ════════════════════════════════════
+   FILTER CORE
+════════════════════════════════════ */
+function filterRec(opts) {
+  var qq = opts.q ? opts.q.toLowerCase() : '';
+  return REC.filter(function(r) {
+    if (opts.single && r.date !== opts.single) return false;
+    if (!opts.single) {
+      if (opts.from && r.date < opts.from) return false;
+      if (opts.to   && r.date > opts.to  ) return false;
+    }
+    if (opts.fy && r.fiscalYear !== opts.fy) return false;
+    if (opts.ac && r.acType     !== opts.ac) return false;
+    if (opts.ft && r.flightType !== opts.ft) return false;
+    if (qq && !searchAll(r, qq)) return false;
+    return true;
+  });
+}
+
+function searchAll(r, q) {
+  return ['day','date','dateDisp','acType','acNo','toLD','flightType',
+          'pilot','mission','callsign','route','iff','fuel','remark','source']
+    .some(function(k){ return r[k] && String(r[k]).toLowerCase().indexOf(q)>-1; });
+}
+
+/* ════════════════════════════════════
+   WEEKLY RENDER
+════════════════════════════════════ */
+function renderW() {
+  var rows = filterRec({
+    fy: val('w-fy'), from: val('w-from'), to: val('w-to'),
+    q: val('w-q').trim(), ac: val('w-ac'), ft: val('w-ft')
+  });
+  rows.sort(function(a,b){ return a.date<b.date?-1:a.date>b.date?1:0; });
+
+  var days = {};
+  rows.forEach(function(r){ days[r.date]=1; });
+  el('w-cnt').textContent  = rows.length.toLocaleString();
+  el('w-days').textContent = Object.keys(days).length.toLocaleString();
+
+  var from=val('w-from'), to=val('w-to');
+  el('w-range').textContent = (from&&to) ? thaiDisp(from)+' – '+thaiDisp(to) :
+                              from ? 'ตั้งแต่ '+thaiDisp(from) :
+                              to   ? 'ถึง '+thaiDisp(to) : '';
+
+  if (!rows.length){ el('w-body').innerHTML=''; show('w-empty',true); return; }
+  show('w-empty',false);
+
+  var html='', lastFY='', lastDate='';
+  rows.forEach(function(r){
+    if (r.fiscalYear !== lastFY) {
+      lastFY=r.fiscalYear; lastDate='';
+      html += '<tr class="fy-row"><td colspan="13">📌 '+esc(r.fiscalYear)+'</td></tr>';
+    }
+    if (r.date !== lastDate) {
+      lastDate=r.date;
+      html += '<tr class="dg-row"><td colspan="13">📅 '+thaiDisp(r.date)+'</td></tr>';
+    }
+    // col order: วัน,วันที่,AC,หมายเลข,T/O-L/D,ชื่อนักบิน,Mission,Callsign,เส้นทาง(left),IFF,Fuel,Remark(left),แหล่ง
+    html += '<tr>'+
+      '<td>'+dayB(r.day)+'</td>'+
+      '<td class="c-dt">'+esc(r.dateDisp)+'</td>'+
+      '<td>'+acB(r.acType)+'</td>'+
+      '<td class="c-acno">'+esc(r.acNo)+'</td>'+
+      '<td class="c-time">'+esc(r.toLD||'—')+'</td>'+
+      '<td>'+esc(r.pilot)+'</td>'+
+      '<td class="c-trunc" title="'+esc(r.mission)+'">'+esc(r.mission)+'</td>'+
+      '<td class="c-cs">'+esc(r.callsign)+'</td>'+
+      '<td class="c-trunc td-left" title="'+esc(r.route)+'">'+esc(r.route)+'</td>'+
+      '<td>'+esc(r.iff)+'</td>'+
+      '<td>'+esc(r.fuel)+'</td>'+
+      '<td class="c-remark td-left" title="'+esc(r.remark)+'">'+esc(r.remark)+'</td>'+
+      '<td>'+srcB(r.source)+'</td>'+
+      '</tr>';
+  });
+  el('w-body').innerHTML = html;
+}
+
+function clearW() {
+  el('w-fy').value   = 'ปีงบฯ 69';
+  el('w-from').value = FY69_FROM;
+  el('w-to').value   = FY69_TO;
+  ['w-q','w-ac','w-ft'].forEach(function(id){ el(id).value=''; });
+  renderW();
+}
+
+/* ════════════════════════════════════
+   DAILY RENDER
+════════════════════════════════════ */
+function renderD() {
+  var rows = filterRec({
+    single: val('d-date'), q: val('d-q').trim(),
+    ac: val('d-ac'), ft: val('d-ft')
+  });
+  rows.sort(function(a,b){
+    var ta=(a.toLD||'').split('-')[0]||'9999';
+    var tb=(b.toLD||'').split('-')[0]||'9999';
+    return ta<tb?-1:ta>tb?1:0;
+  });
+
+  el('d-cnt').textContent = rows.length.toLocaleString();
+  var dt = val('d-date');
+  el('d-label').textContent = dt ? '📅 '+thaiDisp(dt) : '';
+
+  if (!rows.length){ el('d-body').innerHTML=''; show('d-empty',true); return; }
+  show('d-empty',false);
+
+  el('d-body').innerHTML = rows.map(function(r){
+    return '<tr>'+
+      '<td class="c-time">'+esc(r.toLD||'—')+'</td>'+
+      '<td>'+acB(r.acType)+'</td>'+
+      '<td class="c-acno">'+esc(r.acNo)+'</td>'+
+      '<td>'+dayB(r.day)+'</td>'+
+      '<td>'+esc(r.pilot)+'</td>'+
+      '<td class="c-trunc" title="'+esc(r.mission)+'">'+esc(r.mission)+'</td>'+
+      '<td class="c-cs">'+esc(r.callsign)+'</td>'+
+      '<td class="c-trunc td-left" title="'+esc(r.route)+'">'+esc(r.route)+'</td>'+
+      '<td>'+esc(r.iff)+'</td>'+
+      '<td>'+esc(r.fuel)+'</td>'+
+      '<td class="c-remark td-left" title="'+esc(r.remark)+'">'+esc(r.remark)+'</td>'+
+      '<td>'+srcB(r.source)+'</td>'+
+      '</tr>';
+  }).join('');
+}
+
+function clearD() {
+  el('d-date').value = toInputDate(new Date());
+  ['d-q','d-ac','d-ft'].forEach(function(id){ el(id).value=''; });
+  renderD();
+}
+
+/* ════════════════════════════════════
+   BADGES & HELPERS
+════════════════════════════════════ */
+function dayB(day){
+  if (!day) return '';
+  return '<span class="day-b day-'+day+'">'+esc(day)+'</span>';
+}
+var AC_KNOWN=['S-92A','S-70i','EC725','Bell412','H135','UH-1H','UH1H'];
+function acB(t){
+  if (!t) return '';
+  var cls = AC_KNOWN.indexOf(t)>-1 ? 'ac-'+t : 'ac-def';
+  return '<span class="ac '+cls+'">'+esc(t)+'</span>';
+}
+function srcB(s){ return '<span class="src src-'+s+'">'+s+'</span>'; }
+
+var TM=['','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+var TD=['อา.','จ.','อ.','พ.','พฤ.','ศ.','ส.'];
+function thaiDisp(iso){
+  if (!iso) return '';
+  var p=iso.split('-'), d=new Date(iso+'T00:00:00');
+  return TD[d.getDay()]+' '+parseInt(p[2])+' '+TM[parseInt(p[1])]+' '+(parseInt(p[0])+543);
+}
+
+function el(id){ return document.getElementById(id); }
+function val(id){ return el(id).value; }
+function show(id,v){ el(id).style.display=v?'block':'none'; }
+function esc(s){
+  if (!s) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function fillSel(id,opts,ph){
+  var s=el(id);
+  s.innerHTML='<option value="">'+ph+'</option>';
+  opts.forEach(function(v){ s.innerHTML+='<option value="'+esc(v)+'">'+esc(v)+'</option>'; });
+}
+function toInputDate(d){
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+</script>
+</body>
+</html>
